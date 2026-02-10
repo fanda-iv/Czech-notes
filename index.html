@@ -352,9 +352,6 @@
 
         .task-title {
             font-weight: 500;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
         }
 
         .task-description {
@@ -374,7 +371,6 @@
             flex: 1;
             display: flex;
             flex-direction: column;
-            min-width: 0;
         }
 
         .expand-btn {
@@ -475,6 +471,11 @@
         }
 
         .checklist-item.completed span {
+            text-decoration: line-through;
+            color: #a0aec0;
+        }
+
+        .checklist-item.completed .task-title {
             text-decoration: line-through;
             color: #a0aec0;
         }
