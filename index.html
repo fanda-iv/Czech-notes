@@ -263,7 +263,7 @@
 
         .checklist-item {
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             gap: 12px;
             padding: 16px;
             background: #f7fafc;
@@ -371,6 +371,26 @@
             flex: 1;
             display: flex;
             flex-direction: column;
+            gap: 8px;
+        }
+
+        .task-main-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .task-text-wrapper {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .task-buttons-wrapper {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-shrink: 0;
         }
 
         .expand-btn {
@@ -815,17 +835,25 @@
                             >
                         </div>
                         <div class="task-content">
-                            <div class="task-title">${task.text}</div>
+                            <div class="task-main-row">
+                                <div class="task-text-wrapper">
+                                    <div class="task-title">${task.text}</div>
+                                </div>
+                                ${!isEditing ? `
+                                <div class="task-buttons-wrapper">
+                                    ${hasDescription ? `<button class="expand-btn" id="expand-btn-${index}" onclick="toggleDescription(${index})">▼</button>` : ''}
+                                    ${!hasDescription ? `<button class="add-desc-btn" onclick="showDescriptionEditor(${index})">+ Popis</button>` : ''}
+                                    <select class="priority-select" onchange="changePriority(${index}, this.value)">
+                                        <option value="low" ${task.priority === 'low' ? 'selected' : ''}>🟢 Nízká</option>
+                                        <option value="medium" ${task.priority === 'medium' ? 'selected' : ''}>🟠 Střední</option>
+                                        <option value="high" ${task.priority === 'high' ? 'selected' : ''}>🔴 Vysoká</option>
+                                    </select>
+                                    <button class="delete-btn" onclick="deleteTask(${index})">Smazat</button>
+                                </div>
+                                ` : ''}
+                            </div>
                             ${descriptionHTML}
                         </div>
-                        ${!isEditing && hasDescription ? `<button class="expand-btn" id="expand-btn-${index}" onclick="toggleDescription(${index})">▼</button>` : ''}
-                        ${!isEditing && !hasDescription ? `<button class="add-desc-btn" onclick="showDescriptionEditor(${index})">+ Popis</button>` : ''}
-                        ${!isEditing ? `<select class="priority-select" onchange="changePriority(${index}, this.value)">
-                            <option value="low" ${task.priority === 'low' ? 'selected' : ''}>🟢 Nízká</option>
-                            <option value="medium" ${task.priority === 'medium' ? 'selected' : ''}>🟠 Střední</option>
-                            <option value="high" ${task.priority === 'high' ? 'selected' : ''}>🔴 Vysoká</option>
-                        </select>` : ''}
-                        ${!isEditing ? `<button class="delete-btn" onclick="deleteTask(${index})">Smazat</button>` : ''}
                     `;
                     
                     checklist.appendChild(li);
