@@ -236,6 +236,28 @@
 
         .checklist {
             list-style: none;
+            max-height: 400px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding-right: 5px;
+        }
+
+        .checklist::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .checklist::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+
+        .checklist::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 10px;
+        }
+
+        .checklist::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
         }
 
         .checklist-item {
@@ -323,6 +345,128 @@
             font-size: 15px;
             color: #2d3748;
             transition: all 0.3s ease;
+            cursor: pointer;
+            word-wrap: break-word;
+        }
+
+        .task-title {
+            font-weight: 500;
+        }
+
+        .task-description {
+            font-size: 13px;
+            color: #718096;
+            margin-top: 6px;
+            line-height: 1.5;
+            display: none;
+            padding-left: 0;
+        }
+
+        .task-description.visible {
+            display: block;
+        }
+
+        .task-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .expand-btn {
+            padding: 4px 8px;
+            background: transparent;
+            color: #a0aec0;
+            border: none;
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            opacity: 0;
+        }
+
+        .checklist-item:hover .expand-btn {
+            opacity: 1;
+        }
+
+        .expand-btn:hover {
+            background: #e2e8f0;
+            color: #4a5568;
+        }
+
+        .add-desc-btn {
+            padding: 4px 10px;
+            background: transparent;
+            color: #a0aec0;
+            border: 1px dashed #cbd5e0;
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            opacity: 0;
+        }
+
+        .checklist-item:hover .add-desc-btn {
+            opacity: 1;
+        }
+
+        .add-desc-btn:hover {
+            background: #f7fafc;
+            border-color: #667eea;
+            color: #667eea;
+        }
+
+        .description-input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-top: 8px;
+            resize: vertical;
+            min-height: 60px;
+            font-family: inherit;
+            transition: all 0.3s ease;
+            outline: none;
+        }
+
+        .description-input:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .desc-actions {
+            display: flex;
+            gap: 6px;
+            margin-top: 6px;
+        }
+
+        .desc-save-btn, .desc-cancel-btn {
+            padding: 4px 12px;
+            border: none;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-weight: 500;
+        }
+
+        .desc-save-btn {
+            background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+            color: white;
+        }
+
+        .desc-save-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(72, 187, 120, 0.3);
+        }
+
+        .desc-cancel-btn {
+            background: #e2e8f0;
+            color: #4a5568;
+        }
+
+        .desc-cancel-btn:hover {
+            background: #cbd5e0;
         }
 
         .checklist-item.completed span {
@@ -537,6 +681,7 @@
         let stopwatchInterval = null;
         let stopwatchSeconds = 0;
         let stopwatchRunning = false;
+        let editingDescIndex = null;
 
         // Clock functionality
         function updateClock() {
@@ -596,6 +741,37 @@
             localStorage.setItem('tasks', JSON.stringify(tasks));
         }
 
+        function toggleDescription(index) {
+            const descElement = document.getElementById(`desc-${index}`);
+            const btnElement = document.getElementById(`expand-btn-${index}`);
+            
+            if (descElement.classList.contains('visible')) {
+                descElement.classList.remove('visible');
+                btnElement.textContent = '▼';
+            } else {
+                descElement.classList.add('visible');
+                btnElement.textContent = '▲';
+            }
+        }
+
+        function showDescriptionEditor(index) {
+            editingDescIndex = index;
+            renderTasks();
+        }
+
+        function saveDescription(index) {
+            const textarea = document.getElementById(`desc-input-${index}`);
+            tasks[index].description = textarea.value.trim();
+            editingDescIndex = null;
+            saveTasks();
+            renderTasks();
+        }
+
+        function cancelDescription() {
+            editingDescIndex = null;
+            renderTasks();
+        }
+
         function renderTasks() {
             checklist.innerHTML = '';
             
@@ -608,11 +784,21 @@
                     const li = document.createElement('li');
                     li.className = `checklist-item ${task.completed ? 'completed' : ''} priority-${task.priority}`;
                     
-                    const priorityEmojis = {
-                        'high': '🔴',
-                        'medium': '🟠',
-                        'low': '🟢'
-                    };
+                    const hasDescription = task.description && task.description.trim();
+                    const isEditing = editingDescIndex === index;
+                    
+                    let descriptionHTML = '';
+                    if (isEditing) {
+                        descriptionHTML = `
+                            <textarea class="description-input" id="desc-input-${index}" placeholder="Přidej popis k této úloze...">${task.description || ''}</textarea>
+                            <div class="desc-actions">
+                                <button class="desc-save-btn" onclick="saveDescription(${index})">Uložit</button>
+                                <button class="desc-cancel-btn" onclick="cancelDescription()">Zrušit</button>
+                            </div>
+                        `;
+                    } else if (hasDescription) {
+                        descriptionHTML = `<div class="task-description" id="desc-${index}">${task.description}</div>`;
+                    }
                     
                     li.innerHTML = `
                         <div class="checkbox-wrapper">
@@ -622,13 +808,18 @@
                                 onchange="toggleTask(${index})"
                             >
                         </div>
-                        <span>${task.text}</span>
-                        <select class="priority-select" onchange="changePriority(${index}, this.value)">
+                        <div class="task-content">
+                            <div class="task-title">${task.text}</div>
+                            ${descriptionHTML}
+                        </div>
+                        ${!isEditing && hasDescription ? `<button class="expand-btn" id="expand-btn-${index}" onclick="toggleDescription(${index})">▼</button>` : ''}
+                        ${!isEditing && !hasDescription ? `<button class="add-desc-btn" onclick="showDescriptionEditor(${index})">+ Popis</button>` : ''}
+                        ${!isEditing ? `<select class="priority-select" onchange="changePriority(${index}, this.value)">
                             <option value="low" ${task.priority === 'low' ? 'selected' : ''}>🟢 Nízká</option>
                             <option value="medium" ${task.priority === 'medium' ? 'selected' : ''}>🟠 Střední</option>
                             <option value="high" ${task.priority === 'high' ? 'selected' : ''}>🔴 Vysoká</option>
-                        </select>
-                        <button class="delete-btn" onclick="deleteTask(${index})">Smazat</button>
+                        </select>` : ''}
+                        ${!isEditing ? `<button class="delete-btn" onclick="deleteTask(${index})">Smazat</button>` : ''}
                     `;
                     
                     checklist.appendChild(li);
@@ -643,6 +834,7 @@
             if (text) {
                 tasks.push({
                     text: text,
+                    description: '',
                     completed: false,
                     priority: priority
                 });
