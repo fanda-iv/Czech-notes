@@ -885,7 +885,7 @@
             box-shadow: 
                 0 12px 45px rgba(0, 0, 0, 0.2),
                 0 0 0 1px rgba(255, 255, 255, 0.6) inset;
-            cursor: move;
+            cursor: grab;
             transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
             animation: floatBubble 8s infinite ease-in-out;
             user-select: none;
@@ -893,6 +893,10 @@
             max-width: 380px;
             will-change: transform;
             z-index: 100;
+        }
+        
+        .task-bubble:active {
+            cursor: grabbing;
         }
 
         @keyframes floatBubble {
@@ -929,6 +933,25 @@
 
         .task-bubble.completed {
             opacity: 0.7;
+        }
+        
+        .task-bubble.popping {
+            animation: bubblePop 0.6s ease-out forwards !important;
+        }
+        
+        @keyframes bubblePop {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            50% {
+                transform: scale(1.3);
+                opacity: 0.8;
+            }
+            100% {
+                transform: scale(0);
+                opacity: 0;
+            }
         }
 
         .task-bubble.priority-high {
@@ -1276,9 +1299,12 @@
     <script>
         // ========== GITHUB GIST KONFIGURACE ==========
         // DŮLEŽITÉ: Vyplňte svůj GitHub Personal Access Token zde
-        const GITHUB_TOKEN = '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'; // Nahraďte tímto tokenem z GitHubu
+        const GITHUB_TOKEN = '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';
         
-        let gistId = localStorage.getItem('gistId') || '';
+        // SDÍLENÝ GIST ID - všichni uživatelé vidí stejné poznámky
+        const SHARED_GIST_ID = '5838faa854bfce97e24316c69dbe0c61';
+        
+        let gistId = SHARED_GIST_ID; // Používáme sdílený Gist pro všechny
         
         // Funkce pro uložení úkolů na GitHub Gist
         async function saveToGist(tasksData) {
@@ -1300,39 +1326,17 @@
             
             try {
                 let response;
-                if (gistId) {
-                    // Update existing gist
-                    console.log('📝 Aktualizuji Gist:', gistId);
-                    response = await fetch(`https://api.github.com/gists/${gistId}`, {
-                        method: 'PATCH',
-                        headers: {
-                            'Authorization': `Bearer ${GITHUB_TOKEN}`,
-                            'Accept': 'application/vnd.github.v3+json',
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(gistData)
-                    });
-                } else {
-                    // Create new gist
-                    console.log('📝 Vytvářím nový Gist...');
-                    response = await fetch('https://api.github.com/gists', {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${GITHUB_TOKEN}`,
-                            'Accept': 'application/vnd.github.v3+json',
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(gistData)
-                    });
-                    
-                    if (response.ok) {
-                        const data = await response.json();
-                        gistId = data.id;
-                        localStorage.setItem('gistId', gistId);
-                        console.log('✅ Nový Gist vytvořen! ID:', gistId);
-                        console.log('🔗 URL:', data.html_url);
-                    }
-                }
+                console.log('📝 Ukládám do sdíleného Gistu:', gistId);
+                // Update shared gist
+                response = await fetch(`https://api.github.com/gists/${gistId}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Authorization': `Bearer ${GITHUB_TOKEN}`,
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(gistData)
+                });
                 
                 if (!response.ok) {
                     const errorData = await response.json();
@@ -1340,7 +1344,7 @@
                     throw new Error(`GitHub API Error: ${response.status} - ${errorData.message || response.statusText}`);
                 }
                 
-                console.log('✅ Úkoly uloženy na GitHub');
+                console.log('✅ Úkoly uloženy na GitHub - všichni je vidí!');
                 return true;
             } catch (error) {
                 console.error('❌ Chyba při ukládání:', error);
@@ -1353,14 +1357,8 @@
         
         // Funkce pro načtení úkolů z GitHub Gist
         async function loadFromGist() {
-            if (!gistId) {
-                // Pokud nemáme gistId, zkusíme načíst z localStorage
-                console.log('ℹ️ Žádný Gist ID - používám localStorage');
-                return JSON.parse(localStorage.getItem('tasks')) || [];
-            }
-            
             try {
-                console.log('📥 Načítám úkoly z Gistu:', gistId);
+                console.log('📥 Načítám úkoly ze sdíleného Gistu:', gistId);
                 const response = await fetch(`https://api.github.com/gists/${gistId}`, {
                     headers: {
                         'Accept': 'application/vnd.github.v3+json'
@@ -1368,32 +1366,36 @@
                 });
                 
                 if (!response.ok) {
-                    console.warn('⚠️ Gist nenalezen, vytvořím nový');
-                    gistId = '';
-                    localStorage.removeItem('gistId');
-                    return JSON.parse(localStorage.getItem('tasks')) || [];
+                    console.warn('⚠️ Gist nenalezen nebo je prázdný');
+                    return [];
                 }
                 
                 const data = await response.json();
+                
+                // Check if tasks.json exists
+                if (!data.files['tasks.json']) {
+                    console.log('ℹ️ Gist ještě neobsahuje úkoly');
+                    return [];
+                }
+                
                 const content = data.files['tasks.json'].content;
-                console.log('✅ Úkoly načteny z GitHubu');
+                console.log('✅ Úkoly načteny ze sdíleného Gistu');
                 return JSON.parse(content);
             } catch (error) {
                 console.error('❌ Chyba při načítání:', error);
-                // Fallback to localStorage
-                return JSON.parse(localStorage.getItem('tasks')) || [];
+                return [];
             }
         }
         
         // Automatické obnovení dat každých 10 sekund
         setInterval(async () => {
-            if (gistId && GITHUB_TOKEN && GITHUB_TOKEN !== 'VÁŠ_TOKEN_ZDE') {
+            if (SHARED_GIST_ID && GITHUB_TOKEN) {
                 try {
                     const freshTasks = await loadFromGist();
                     if (JSON.stringify(freshTasks) !== JSON.stringify(tasks)) {
                         tasks = freshTasks;
                         renderTasks();
-                        console.log('🔄 Úkoly aktualizovány z GitHubu');
+                        console.log('🔄 Úkoly aktualizovány ze sdíleného Gistu');
                     }
                 } catch (error) {
                     console.error('Chyba při auto-refresh:', error);
@@ -1706,6 +1708,13 @@
                 bubble.addEventListener('mousedown', startDragBubble);
                 bubble.addEventListener('touchstart', startDragBubble, { passive: false });
                 
+                // Click to pop bubble (except on buttons and inputs)
+                bubble.addEventListener('click', function(e) {
+                    if (e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT') {
+                        popBubble(bubble);
+                    }
+                });
+                
                 container.appendChild(bubble);
             });
 
@@ -1714,6 +1723,54 @@
             
             // Start Flappy Bird
             initFlappyBird();
+        }
+        
+        // Pop bubble with animation and create new one
+        function popBubble(bubble) {
+            bubble.classList.add('popping');
+            
+            // Wait for animation to finish, then create new bubble
+            setTimeout(() => {
+                const container = document.getElementById('bubblesContainer');
+                const windowWidth = window.innerWidth;
+                const windowHeight = window.innerHeight;
+                
+                // Create new decorative bubble at random position
+                const newBubble = document.createElement('div');
+                newBubble.className = 'deco-bubble';
+                
+                const size = Math.random() * 80 + 40;
+                newBubble.style.width = size + 'px';
+                newBubble.style.height = size + 'px';
+                newBubble.style.left = Math.random() * windowWidth + 'px';
+                newBubble.style.top = Math.random() * windowHeight + 'px';
+                
+                const colors = [
+                    'rgba(240, 147, 251, 0.2)',
+                    'rgba(79, 172, 254, 0.2)',
+                    'rgba(250, 112, 154, 0.2)',
+                    'rgba(254, 215, 102, 0.2)',
+                    'rgba(72, 187, 120, 0.2)'
+                ];
+                newBubble.style.background = colors[Math.floor(Math.random() * colors.length)];
+                newBubble.style.animationDelay = '0s';
+                newBubble.style.animationDuration = (Math.random() * 8 + 8) + 's';
+                
+                // Add click handler to new bubble
+                newBubble.addEventListener('click', function() {
+                    this.classList.add('popping');
+                    setTimeout(() => {
+                        this.remove();
+                        // Create another one
+                        popBubble(this);
+                    }, 600);
+                });
+                
+                document.getElementById('decoBubblesContainer').appendChild(newBubble);
+                
+                // Remove original bubble
+                bubble.remove();
+            }, 600);
         }
 
         // Create decorative bubbles
@@ -1741,6 +1798,31 @@
                 bubble.style.background = colors[Math.floor(Math.random() * colors.length)];
                 bubble.style.animationDelay = (Math.random() * 5) + 's';
                 bubble.style.animationDuration = (Math.random() * 8 + 8) + 's';
+                
+                // Add click to pop decorative bubbles
+                bubble.addEventListener('click', function() {
+                    this.classList.add('popping');
+                    setTimeout(() => {
+                        // Create new bubble in random position
+                        const newBubble = document.createElement('div');
+                        newBubble.className = 'deco-bubble';
+                        
+                        const newSize = Math.random() * 80 + 40;
+                        newBubble.style.width = newSize + 'px';
+                        newBubble.style.height = newSize + 'px';
+                        newBubble.style.left = Math.random() * window.innerWidth + 'px';
+                        newBubble.style.top = Math.random() * window.innerHeight + 'px';
+                        newBubble.style.background = colors[Math.floor(Math.random() * colors.length)];
+                        newBubble.style.animationDelay = '0s';
+                        newBubble.style.animationDuration = (Math.random() * 8 + 8) + 's';
+                        
+                        // Add click handler to new bubble
+                        newBubble.addEventListener('click', arguments.callee);
+                        
+                        container.appendChild(newBubble);
+                        this.remove();
+                    }, 600);
+                });
                 
                 container.appendChild(bubble);
             }
@@ -1848,6 +1930,7 @@
         let gameActive = false;
         let animationId;
         let canvas, ctx;
+        let isHolding = false; // Pro držení myši/prstu
 
         function initFlappyBird() {
             canvas = document.getElementById('flappyCanvas');
@@ -1855,10 +1938,29 @@
             
             resetFlappyBird();
             
-            canvas.addEventListener('click', flap);
-            canvas.addEventListener('touchstart', flap);
+            // Držení myši
+            canvas.addEventListener('mousedown', startHolding);
+            canvas.addEventListener('mouseup', stopHolding);
+            canvas.addEventListener('mouseleave', stopHolding);
+            
+            // Držení prstu na mobilu
+            canvas.addEventListener('touchstart', startHolding);
+            canvas.addEventListener('touchend', stopHolding);
             
             gameLoop();
+        }
+        
+        function startHolding(e) {
+            e.preventDefault();
+            if (!gameActive) {
+                resetFlappyBird();
+            }
+            isHolding = true;
+        }
+        
+        function stopHolding(e) {
+            e.preventDefault();
+            isHolding = false;
         }
 
         function resetFlappyBird() {
@@ -1869,13 +1971,6 @@
             document.getElementById('flappyScore').textContent = score;
         }
 
-        function flap() {
-            if (!gameActive) {
-                resetFlappyBird();
-            }
-            bird.velocity = -6;
-        }
-
         function gameLoop() {
             if (!document.getElementById('adhdMode').classList.contains('active')) {
                 return;
@@ -1884,8 +1979,12 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
             if (gameActive) {
-                // Update bird
-                bird.velocity += 0.5;
+                // Update bird - držení způsobí konstantní let nahoru
+                if (isHolding) {
+                    bird.velocity = -4; // Mírné zrychlení nahoru při držení
+                } else {
+                    bird.velocity += 0.5; // Gravitace
+                }
                 bird.y += bird.velocity;
                 
                 // Bird boundaries
